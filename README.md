@@ -1,6 +1,13 @@
 # KQL Analysis Project: LANL Network &amp; Security Logs
 ## Dataset Overview
 We select the LANL ARCS 2017 Unified Host and Network Data Set as our source. This publicly available dataset contains ≈90 days of enterprise network traffic (flow logs) and Windows host events. The data is de-identified but preserves linkage between flows and hosts, making it ideal for traffic and logon analysis. Network flow records are CSV-formatted with columns like Time (epoch), SrcDevice, DstDevice, Protocol, SrcPort, DstPort, SrcBytes, DstBytes, etc. The host logs are JSON lines from Windows Security events (e.g. successful logon 4624 or failure 4625). Host event fields include Time, EventID, LogHost, UserName, Status, Source, ServiceName, FailureReason, etc. Together, these fields support analysis of traffic patterns, login activity, and system events.
+## Dataset documentation
+You can access the LANL Unified Host and Network Dataset through the following official source:
+
+Los Alamos National Laboratory Cyber Security Research: https://csr.lanl.gov/data/2017/
+
+This dataset comprises approximately 90 days of de-identified network flow records and Windows host event logs collected from the Los Alamos National Laboratory enterprise network. The data is anonymized to protect operational security while preserving the relationships between hosts and events, making it suitable for various cybersecurity analyses
+
 ## Schema and Ingestion Queries
 We define corresponding Kusto tables and ingest the data. The following KQL creates tables with appropriate column names and types, then ingests sample records (for demonstration; real ingestion would use bulk loads or mappings):
 ```
@@ -18,14 +25,12 @@ We define corresponding Kusto tables and ingest the data. The following KQL crea
     SrcBytes: long,        // bytes sent by source
     DstBytes: long         // bytes sent by dest
 );
-```
-```
+
 // Ingest example flow record (CSV fields): Time=761s, 4434s duration, etc.
 .ingest inline into table NetworkEvents <|
 761,4434,Comp132598,Comp817788,6,12597,22,89159,85257,15495068,69768940
-kql
-Copy
-Edit
+```
+```
 // Create table for Windows host security events
 .create table HostEvents (
     Time: datetime,           // event time (epoch seconds)
@@ -42,8 +47,7 @@ Edit
     ProcessID: int,           // process ID
     ParentProcessName: string // parent process name
 );
-```
-```
+
 // Ingest example host event (CSV): time=1640995200s, EventID=4625 (failure), user alice
 .ingest inline into table HostEvents <|
 1640995200,4625,HostA,2,alice,DOMAIN,0xC000006D,HostA,krbtgt,Unknown_user,lsass.exe,4321,services.exe
@@ -52,54 +56,55 @@ Edit
 
 ## Basic Queries
 With data in place, we can query it using KQL. The following examples demonstrate retrieving all data, filtering, and aggregations:
-kql
-Copy
-Edit
+```
+
 // Retrieve all network flow records
 NetworkEvents
-kql
-Copy
-Edit
+```
+```
+
 // Filter network flows by a date range
 NetworkEvents
 | where Time between (datetime(2017-07-03) .. datetime(2017-07-04))
-kql
-Copy
-Edit
+```
+```
+
 // Filter for flows to destination port 443 (HTTPS traffic)
 NetworkEvents
 | where DstPort == "443"
-kql
-Copy
-Edit
+```
+```
+
 // Count events per protocol
 NetworkEvents
 | summarize TotalCount = count() by Protocol
-kql
-Copy
-Edit
+```
+```
+
 // Top 5 source devices by number of flows
 NetworkEvents
 | summarize Count = count() by SrcDevice
 | sort by Count desc
 | take 5
-kql
-Copy
-Edit
+```
+```
+
 // Top 5 users with most failed logon attempts (EventID 4625)
 HostEvents
 | where EventID == 4625
 | summarize FailedCount = count() by UserName
 | sort by FailedCount desc
 | take 5
-kql
-Copy
-Edit
+```
+```
+
 // Hourly success vs. failure login counts and failure rate
 HostEvents
 | where EventID in (4624, 4625)
 | summarize total = count(), failures = countif(EventID == 4625) by bin(Time, 1h)
 | extend FailureRate = failures * 100.0 / total
+```
+
 Each query includes comments (// ...) explaining its purpose. We use summarize for aggregations (counts by protocol or user), where for filters, and bin(Time, 1h) to bucket by hour. The countif() function easily computes failure vs. success counts.
 
 ## Visualization Suggestions
